@@ -87,13 +87,13 @@ our $VERSION = '0.09';
             foreach my $line (split(/\r\n|\r|\n/, $args{str})) {
                 
                 $tabed .=
-                    &_tab2space(str => $line, tab_width => $args{tab_width}). "\n";
+                    &_tab2space($line, $args{tab_width}). "\n";
             }
             
             $args{str} = $tabed;
         }
         
-        return $self->_doLine(str => $args{str});
+        return $self->_doLine($args{str});
     }
     
     ### ---
@@ -117,14 +117,14 @@ our $VERSION = '0.09';
         
         while (my $line = <$filehandle>) {
             if ($args{tab_width} > 0) {
-                $line = &_tab2space(str => $line, tab_width => $args{tab_width});
+                $line = &_tab2space($line, $args{tab_width});
             }
             $str .= $line;
         }
         
         close($filehandle);
         
-        return $self->_doLine(str => $str);
+        return $self->_doLine($str);
     }
     
     ### ---
@@ -132,10 +132,8 @@ our $VERSION = '0.09';
     ### ---
     sub _doLine {
         
-        my $self = shift;
-        my %args = (str => '', @_);
+        my ($self, $str) = @_;
         
-        my $str = $args{str};
         $str =~ s/\r\n|\r/\n/g;
         
         $self->{_markup_map} = [];
@@ -143,7 +141,7 @@ our $VERSION = '0.09';
         ### make markup map
         foreach my $i (0 .. $#{$self->{syntax}}) {
             $self->_makeAllowHash($i);
-            $self->_make_map(str => $str, index => $i);
+            $self->_make_map($str, $i);
         }
     
         my $outstr = '';
@@ -201,30 +199,30 @@ our $VERSION = '0.09';
         
         no warnings; ### Avoid Deep Recursion warning
         
-        my $self = shift;
-        my %args = (str => '', pos => 0, index => undef, @_);
+        my ($self, $str, $index, $pos) = @_;
+        $pos ||= 0;
         
         my $map_ref = $self->{_markup_map};
         
         my @scraps =
-            split(/$self->{syntax}->[$args{index}]->{regexp}/, $args{str}, 2);
+            split(/$self->{syntax}->[$index]->{regexp}/, $str, 2);
     
         if ((scalar @scraps) >= 2) {
             
             my $rest = pop(@scraps);
-            my $ins_pos0 = $args{pos} + length($scraps[0]);
-            my $ins_pos1 = $args{pos} + (length($args{str}) - length($rest));
+            my $ins_pos0 = $pos + length($scraps[0]);
+            my $ins_pos1 = $pos + (length($str) - length($rest));
             
             ### Add markup position
             push(@$map_ref, [
                     $ins_pos0,
                     $ins_pos1,
-                    $args{index},
+                    $index,
                 ]
             );
             
             ### Recurseion for rest
-            $self->_make_map(%args, str => $rest, pos => $ins_pos1);
+            $self->_make_map($rest, $index, $ins_pos1);
         }
         
         ### Follow up process
@@ -322,18 +320,20 @@ our $VERSION = '0.09';
         
         no warnings 'recursion';
         
-        my %args = (str => '', tab_width => 4, @_);
-        my @scraps = split(/\t/, $args{str}, 2);
+        my ($str, $width) = @_;
+        $str ||= '';
+        $width = defined $width ? $width : 4;
+        my @scraps = split(/\t/, $str, 2);
         
         if (scalar @scraps == 2) {
             
-            my $num = $args{tab_width} - (length($scraps[0]) % $args{tab_width});
-            my $right_str = &_tab2space(%args, str => $scraps[1]);
+            my $num = $width - (length($scraps[0]) % $width);
+            my $right_str = &_tab2space($scraps[1], $width);
             
             return ($scraps[0]. ' ' x $num. $right_str);
         }
         
-        return $args{str};
+        return $str;
     }
     
     ### ---
