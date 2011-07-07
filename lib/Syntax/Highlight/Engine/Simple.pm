@@ -378,7 +378,7 @@ Syntax::Highlight::Engine::Simple - Simple Syntax Highlight Engine
 
 =head1 VERSION
 
-This document describes Syntax::Highlight::Engine::Simple version 0.07
+This document describes Syntax::Highlight::Engine::Simple
 
 =head1 SYNOPSIS
 
