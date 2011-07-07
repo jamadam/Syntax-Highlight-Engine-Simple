@@ -4,7 +4,7 @@ use strict;
 use Carp;
 use UNIVERSAL::require;
 #use version;
-our $VERSION = '0.08';
+our $VERSION = '0.09';
 
 ### ----------------------------------------------------------------------------
 ### constractor
