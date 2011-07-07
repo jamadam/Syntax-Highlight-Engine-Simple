@@ -5,7 +5,7 @@ use Test::More;
 
 eval {
     require Test::Perl::Critic;
-    Test::Perl::Critic->import(-profile => "t/perlcriticrc")
+    Test::Perl::Critic->import(-profile => "xt/perlcriticrc")
 };
 
 if ($@) {

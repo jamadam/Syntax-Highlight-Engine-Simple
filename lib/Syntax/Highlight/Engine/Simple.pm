@@ -2,421 +2,374 @@ package Syntax::Highlight::Engine::Simple;
 use warnings;
 use strict;
 use Carp;
-use UNIVERSAL::require;
-#use version;
 our $VERSION = '0.09';
 
-### ----------------------------------------------------------------------------
-### constractor
-### ----------------------------------------------------------------------------
-sub new {
-    
-    my $class = shift;
-    my $self =
-        bless {type => undef, syntax  => undef, @_}, $class;
-    
-    $self->setParams(@_);
-    
-    if ($self->{type}) {
+    ### ---
+    ### constructor
+    ### ---
+    sub new {
         
-        my $class = "Syntax::Highlight::Engine::Simple::". $self->{type};
+        my $class = shift;
+        my $self = bless {type => undef, syntax  => undef, @_}, $class;
         
-        $class->require or croak $@;
+        $self->setParams(@_);
         
-        no strict 'refs';
-        &{$class. "::setSyntax"}($self);
+        if ($self->{type}) {
+            
+            my $class = "Syntax::Highlight::Engine::Simple::". $self->{type};
+            
+            require $class;
+            $class->setSyntax();
+            
+            return $self;
+        }
+        
+        $self->setSyntax();
         
         return $self;
     }
     
-    $self->setSyntax();
-    
-    return $self;
-}
-
-### ----------------------------------------------------------------------------
-### set params
-### ----------------------------------------------------------------------------
-sub setParams {
-    
-    my $self = shift;
-    
-    my %args = (
-        html_escape_code_ref => \&_html_escape,
-        @_);
-
-    $self->{html_escape_code_ref} = $args{html_escape_code_ref};
-}
-
-### ----------------------------------------------------------------------------
-### set syntax
-### ----------------------------------------------------------------------------
-sub setSyntax {
-    
-    my $self = shift;
-    my %args = (syntax => [], @_);
-    
-    $self->{syntax} = $args{syntax};
-}
-
-### ----------------------------------------------------------------------------
-### append syntax
-### ----------------------------------------------------------------------------
-sub appendSyntax {
-    
-    my $self = shift;
-    my %args = (
-        syntax => {
-            regexp      => '',
-            class       => '',
-            container   => undef,
-        }, @_);
-    
-    push(@{$self->{syntax}}, $args{syntax});
-}
-
-### ----------------------------------------------------------------------------
-### Highlight multi Line
-### ----------------------------------------------------------------------------
-sub doStr{
-    
-    my $self = shift;
-    my %args = (str => '', tab_width => -1, @_);
-    
-    defined $args{str} or croak 'doStr method got undefined value';
-    
-    if ($args{tab_width} > 0) {
+    ### ---
+    ### set params
+    ### ---
+    sub setParams {
         
-        my $tabed = '';
+        my $self = shift;
         
-        foreach my $line (split(/\r\n|\r|\n/, $args{str})) {
-            
-            $tabed .=
-                &_tab2space(str => $line, tab_width => $args{tab_width}). "\n";
-        }
-        
-        $args{str} = $tabed;
+        my %args = (
+            html_escape_code_ref => \&_html_escape,
+            @_);
+    
+        $self->{html_escape_code_ref} = $args{html_escape_code_ref};
     }
     
-    return $self->_doLine(str => $args{str});
-}
-
-### ----------------------------------------------------------------------------
-### Highlight file
-### ----------------------------------------------------------------------------
-sub doFile {
+    ### ---
+    ### set syntax
+    ### ---
+    sub setSyntax {
+        
+        my $self = shift;
+        my %args = (syntax => [], @_);
+        
+        $self->{syntax} = $args{syntax};
+    }
     
-    my $self = shift;
-    my %args = (
-        file => '',
-        tab_width => -1,
-        encode => 'utf8',
-        @_);
+    ### ---
+    ### append syntax
+    ### ---
+    sub appendSyntax {
+        
+        my $self = shift;
+        my %args = (
+            syntax => {
+                regexp      => '',
+                class       => '',
+                container   => undef,
+            }, @_);
+        
+        push(@{$self->{syntax}}, $args{syntax});
+    }
     
-    my $str = '';
-    
-    require 5.005;
-    
-    open(my $filehandle, '<'. $args{file}) or croak 'File open failed';
-    binmode($filehandle, ":encoding($args{encode})");
-    
-    while (my $line = <$filehandle>) {
+    ### ---
+    ### Highlight multi Line
+    ### ---
+    sub doStr{
+        
+        my $self = shift;
+        my %args = (str => '', tab_width => -1, @_);
+        
+        defined $args{str} or croak 'doStr method got undefined value';
         
         if ($args{tab_width} > 0) {
             
-            $line = &_tab2space(str => $line, tab_width => $args{tab_width});
+            my $tabed = '';
+            
+            foreach my $line (split(/\r\n|\r|\n/, $args{str})) {
+                
+                $tabed .=
+                    &_tab2space(str => $line, tab_width => $args{tab_width}). "\n";
+            }
+            
+            $args{str} = $tabed;
         }
         
-        $str .= $line;
+        return $self->_doLine(str => $args{str});
     }
     
-    close($filehandle);
-    
-    return $self->_doLine(str => $str);
-}
-
-### ----------------------------------------------------------------------------
-### Highlight single line
-### ----------------------------------------------------------------------------
-sub _doLine {
-    
-    my $self = shift;
-    my %args = (
-        str         => '', 
-        @_);
-    
-    my $str = $args{str}; $str =~ s/\r\n|\r/\n/g;
-    
-    $self->{_markup_map} = [];
-    
-    ### make markup map
-    foreach my $i (0 .. $#{$self->{syntax}}) {
+    ### ---
+    ### Highlight file
+    ### ---
+    sub doFile {
         
-        $self->_makeAllowHash($i);
-        $self->_make_map(str => $str, index => $i);
-    }
-
-    my $outstr = '';
-    my $last_pos = 0;
-    
-    ### Apply the map to string
-    foreach my $pos ($self->_restracture_map()) {
+        my $self = shift;
+        my %args = (
+            file => '',
+            tab_width => -1,
+            encode => 'utf8',
+            @_);
         
-        my $str_left = substr($str, $last_pos, $$pos[0] - $last_pos);
+        my $str = '';
         
-        no strict 'refs';
-        $outstr .= &{$self->{html_escape_code_ref}}($str_left);
+        require 5.005;
         
-        if (defined $$pos[1]) {
-            
-            $outstr .=
-                sprintf(
-                    "<span class='%s'>",
-                    $$pos[1]->{class}
-                );
-        } 
+        open(my $filehandle, '<'. $args{file}) or croak 'File open failed';
+        binmode($filehandle, ":encoding($args{encode})");
         
-        else {
-            
-            $outstr .= '</span>';
+        while (my $line = <$filehandle>) {
+            if ($args{tab_width} > 0) {
+                $line = &_tab2space(str => $line, tab_width => $args{tab_width});
+            }
+            $str .= $line;
         }
         
-        $last_pos = $$pos[0];
+        close($filehandle);
+        
+        return $self->_doLine(str => $str);
     }
     
-    no strict 'refs';
-    $outstr .= &{$self->{html_escape_code_ref}}(substr($str, $last_pos));
-    
-    return $outstr;
-}
-
-### ----------------------------------------------------------------------------
-### Prepare hash for container matching
-### ----------------------------------------------------------------------------
-sub _makeAllowHash {
-    
-    my $self = shift;
-    
-    if (! exists $self->{syntax}->[$_[0]]->{container} ) {
+    ### ---
+    ### Highlight single line
+    ### ---
+    sub _doLine {
         
+        my $self = shift;
+        my %args = (str => '', @_);
+        
+        my $str = $args{str};
+        $str =~ s/\r\n|\r/\n/g;
+        
+        $self->{_markup_map} = [];
+        
+        ### make markup map
+        foreach my $i (0 .. $#{$self->{syntax}}) {
+            $self->_makeAllowHash($i);
+            $self->_make_map(str => $str, index => $i);
+        }
+    
+        my $outstr = '';
+        my $last_pos = 0;
+        
+        ### Apply the map to string
+        foreach my $pos ($self->_restracture_map()) {
+            
+            my $str_left = substr($str, $last_pos, $$pos[0] - $last_pos);
+            
+            $outstr .= $self->{html_escape_code_ref}->($str_left);
+            
+            if (defined $$pos[1]) {
+                $outstr .= sprintf("<span class='%s'>", $$pos[1]->{class});
+            } else {
+                $outstr .= '</span>';
+            }
+            $last_pos = $$pos[0];
+        }
+        
+        return $outstr. $self->{html_escape_code_ref}->(substr($str, $last_pos));
+    }
+    
+    ### ---
+    ### Prepare hash for container matching
+    ### ---
+    sub _makeAllowHash {
+        
+        my $self = shift;
+        
+        if (! exists $self->{syntax}->[$_[0]]->{container} ) {
+            return;
+        }
+        
+        my $allowed = $self->{syntax}->[$_[0]]->{container};
+        
+        if (ref $allowed eq 'ARRAY') {
+            foreach my $class ( @$allowed ) {
+                $self->{syntax}->[$_[0]]->{_cont_hash}->{$class} = 0;
+            }
+        } elsif ($allowed) {
+            $self->{syntax}->[$_[0]]->{_cont_hash}->{$allowed} = 0;
+        }
+    }
+    
+    ### ---
+    ### Make markup map
+    ### ---------------------------------------
+    ### | open_pos  | close_pos | syntax index
+    ### | open_pos  | close_pos | syntax index
+    ### | open_pos  | close_pos | syntax index
+    ### ---------------------------------------
+    ### ---
+    sub _make_map {
+        
+        no warnings; ### Avoid Deep Recursion warning
+        
+        my $self = shift;
+        my %args = (str => '', pos => 0, index => undef, @_);
+        
+        my $map_ref = $self->{_markup_map};
+        
+        my @scraps =
+            split(/$self->{syntax}->[$args{index}]->{regexp}/, $args{str}, 2);
+    
+        if ((scalar @scraps) >= 2) {
+            
+            my $rest = pop(@scraps);
+            my $ins_pos0 = $args{pos} + length($scraps[0]);
+            my $ins_pos1 = $args{pos} + (length($args{str}) - length($rest));
+            
+            ### Add markup position
+            push(@$map_ref, [
+                    $ins_pos0,
+                    $ins_pos1,
+                    $args{index},
+                ]
+            );
+            
+            ### Recurseion for rest
+            $self->_make_map(%args, str => $rest, pos => $ins_pos1);
+        }
+        
+        ### Follow up process
+        elsif (@$map_ref) {
+            
+            @$map_ref = sort {
+                    $$a[0] <=> $$b[0] or
+                    $$b[1] <=> $$a[1] or
+                    $$a[2] <=> $$b[2]
+                } @$map_ref;
+        }
+    
         return;
     }
     
-    my $allowed = $self->{syntax}->[$_[0]]->{container};
-    
-    if (ref $allowed eq 'ARRAY') {
+    ### ---
+    ### restracture the map data into following format
+    ### ------------------------
+    ### | open_pos  | syntax ref
+    ### | close_pos |       
+    ### | open_pos  | syntax ref
+    ### | close_pos |       
+    ### ------------------------
+    ### ---
+    sub _restracture_map {
         
-        foreach my $class ( @$allowed ) {
+        my $self = shift;
+        my $map_ref = $self->{_markup_map};
+        my @out_array;
+        my @root = ();
+        
+        REGLOOP: for (my $i = 0; $i < scalar @$map_ref; $i++) {
             
-            $self->{syntax}->[$_[0]]->{_cont_hash}->{$class} = 0;
-        }
-    }
-    
-    elsif ($allowed) {
-        
-        $self->{syntax}->[$_[0]]->{_cont_hash}->{$allowed} = 0;
-    }
-}
-
-### ----------------------------------------------------------------------------
-### Make markup map
-### ---------------------------------------
-### | open_pos  | close_pos | syntax index
-### | open_pos  | close_pos | syntax index
-### | open_pos  | close_pos | syntax index
-### ---------------------------------------
-### ----------------------------------------------------------------------------
-sub _make_map {
-    
-    no warnings; ### Avoid Deep Recursion warning
-    
-    my $self = shift;
-    my %args = (str => '', pos => 0, index => undef, @_);
-    
-    my $map_ref = $self->{_markup_map};
-    
-    my @scraps =
-        split(/$self->{syntax}->[$args{index}]->{regexp}/, $args{str}, 2);
-
-    if ((scalar @scraps) >= 2) {
-        
-        my $rest = pop(@scraps);
-        my $ins_pos0 = $args{pos} + length($scraps[0]);
-        my $ins_pos1 = $args{pos} + (length($args{str}) - length($rest));
-        
-        ### Add markup position
-        push(
-            @$map_ref, [
-                $ins_pos0,
-                $ins_pos1,
-                $args{index},
-            ]
-        );
-        
-        ### Recurseion for rest
-        $self->_make_map(%args, str => $rest, pos => $ins_pos1);
-    }
-    
-    ### Follow up process
-    elsif (@$map_ref) {
-        
-        @$map_ref =
-            sort {
-                $$a[0] <=> $$b[0] or
-                $$b[1] <=> $$a[1] or
-                $$a[2] <=> $$b[2]
-            } @$map_ref;
-    }
-
-    return;
-}
-
-### ----------------------------------------------------------------------------
-### restracture the map data into following format
-### ------------------------
-### | open_pos  | syntax ref
-### | close_pos |       
-### | open_pos  | syntax ref
-### | close_pos |       
-### ------------------------
-### ----------------------------------------------------------------------------
-sub _restracture_map {
-    
-    my $self = shift;
-    my $map_ref = $self->{_markup_map};
-    my @out_array;
-    my @root = ();
-
-    
-    REGLOOP: for (my $i = 0; $i < scalar @$map_ref; $i++) {
-        
-        ### vacuum @root
-        for (my $j = 0; $j < scalar @root; $j++) {
-            
-            if ($root[$j]->[1] <= $$map_ref[$i]->[0]) {
-                
-                splice(@root, $j--, 1);
-            }
-        }
-
-        my $syntax_ref = $self->{syntax}->[$$map_ref[$i]->[2]];
-        my $ok = 0;
-        
-        ### no container restriction
-        if (! exists $$syntax_ref{container}) {
-            
-            if (!scalar @root) {
-                
-                $ok = 1;
-            }
-        }
-        
-        else {
-            
-            ### Search for container
-            BACKWARD: for (my $j = scalar @root - 1;  $j >= 0; $j--) {
-                
-                ### overlap?
-                if ($root[$j]->[1] > $$map_ref[$i]->[0]) {
-                    
-                    ### contained?
-                    if ($root[$j]->[1] >= $$map_ref[$i]->[1]) {
-                        
-                        my $root_class =
-                            $self->{syntax}->[$root[$j]->[2]]->{class};
-                        
-                        if (exists $$syntax_ref{_cont_hash}->{$root_class}) {
-                            
-                            $ok = 1; last BACKWARD; # allowed
-                        }
-                        
-                        last BACKWARD; # container not allowed
-                    }
-                    
-                    last BACKWARD; # illigal overlap
+            ### vacuum @root
+            for (my $j = 0; $j < scalar @root; $j++) {
+                if ($root[$j]->[1] <= $$map_ref[$i]->[0]) {
+                    splice(@root, $j--, 1);
                 }
-                
-                splice(@root, $j, 1);
             }
-        }
-        
-        if (! $ok) {
+    
+            my $syntax_ref = $self->{syntax}->[$$map_ref[$i]->[2]];
+            my $ok = 0;
             
-            splice(@$map_ref, $i--, 1);
-            next REGLOOP;
+            ### no container restriction
+            if (! exists $$syntax_ref{container}) {
+                if (!scalar @root) {
+                    $ok = 1;
+                }
+            } else {
+                
+                ### Search for container
+                BACKWARD: for (my $j = scalar @root - 1;  $j >= 0; $j--) {
+                    
+                    ### overlap?
+                    if ($root[$j]->[1] > $$map_ref[$i]->[0]) {
+                        
+                        ### contained?
+                        if ($root[$j]->[1] >= $$map_ref[$i]->[1]) {
+                            
+                            my $root_class =
+                                $self->{syntax}->[$root[$j]->[2]]->{class};
+                            
+                            if (exists $$syntax_ref{_cont_hash}->{$root_class}) {
+                                $ok = 1; last BACKWARD; # allowed
+                            }
+                            last BACKWARD; # container not allowed
+                        }
+                        last BACKWARD; # illigal overlap
+                    }
+                    splice(@root, $j, 1);
+                }
+            }
+            
+            if (! $ok) {
+                splice(@$map_ref, $i--, 1);
+                next REGLOOP;
+            }
+            
+            push(@root, $$map_ref[$i]);
+            
+            push(
+                @out_array,
+                [$$map_ref[$i]->[0], $syntax_ref],
+                [$$map_ref[$i]->[1]]
+            );
+        }
+        @out_array = sort {$$a[0] <=> $$b[0]} @out_array;
+        return @out_array;
+    }
+    
+    ### ---
+    ### replace tabs to spaces
+    ### ---
+    sub _tab2space {
+        
+        no warnings 'recursion';
+        
+        my %args = (str => '', tab_width => 4, @_);
+        my @scraps = split(/\t/, $args{str}, 2);
+        
+        if (scalar @scraps == 2) {
+            
+            my $num = $args{tab_width} - (length($scraps[0]) % $args{tab_width});
+            my $right_str = &_tab2space(%args, str => $scraps[1]);
+            
+            return ($scraps[0]. ' ' x $num. $right_str);
         }
         
-        push(@root, $$map_ref[$i]);
-        
-        push(
-            @out_array,
-            [$$map_ref[$i]->[0], $syntax_ref],
-            [$$map_ref[$i]->[1]]
-        );
+        return $args{str};
     }
     
-    return
-        sort {
-            $$a[0] <=> $$b[0]
-            #or
-            #(defined $$a[1]) <=> (defined $$b[1])
-        } @out_array;
-}
-
-### ----------------------------------------------------------------------------
-### replace tabs to spaces
-### ----------------------------------------------------------------------------
-sub _tab2space {
-    
-    no warnings; ### Avoid Deep Recursion warning
-    
-    my %args = (str => '', tab_width => 4, @_);
-    my @scraps = split(/\t/, $args{str}, 2);
-    
-    if (scalar @scraps == 2) {
+    ### ---
+    ### convert array to regexp
+    ### ---
+    sub array2regexp {
         
-        my $num = $args{tab_width} - (length($scraps[0]) % $args{tab_width});
-        my $right_str = &_tab2space(%args, str => $scraps[1]);
+        my $self = shift;
         
-        return ($scraps[0]. ' ' x $num. $right_str);
+        return sprintf('\\b(?:%s)\\b', join('|', @_));
     }
     
-    return $args{str};
-}
+    ### ---
+    ### Return Class names 
+    ### ---
+    sub getClassNames {
+        
+        return map {${$_}{class}} @{shift->{syntax}}
+    }
+    
+    ### ---
+    ### HTML escape
+    ### ---
+    sub _html_escape {
+        
+        my ($str) = @_;
+        
+        $str =~ s/&/&amp;/g;
+        $str =~ s/</&lt;/g;
+        $str =~ s/>/&gt;/g;
+        
+        return $str;
+    }
 
-### ----------------------------------------------------------------------------
-### convert array to regexp
-### ----------------------------------------------------------------------------
-sub array2regexp {
-    
-    my $self = shift;
-    
-    return sprintf('\\b(?:%s)\\b', join('|', @_));
-}
+1;
 
-### ----------------------------------------------------------------------------
-### Return Class names 
-### ----------------------------------------------------------------------------
-sub getClassNames {
-    
-    return map {${$_}{class}} @{shift->{syntax}}
-}
-
-### ----------------------------------------------------------------------------
-### HTML escape
-### ----------------------------------------------------------------------------
-sub _html_escape {
-    
-    my ($str) = @_;
-    
-    $str =~ s/&/&amp;/g;
-    $str =~ s/</&lt;/g;
-    $str =~ s/>/&gt;/g;
-    
-    return $str;
-}
-
-1; # Magic true value required at end of module
 __END__
 
 =head1 NAME
@@ -490,13 +443,13 @@ This method calls for following arguments.
 
 B<html_escape_code_ref>
 
-HTML escape code ref. Default subroutine escapes 3 charactors '&', '<' and '>'.
+HTML escape code ref. Default subroutine escapes 3 characters '&', '<' and '>'.
 
 =back
 
 =head2 setSyntax
 
-Set the rules for highlight. It calles for a argument I<syntax> in array.
+Set the rules for highlight. It calls for a argument I<syntax> in array.
 
     $highlighter->setSyntax(
         syntax => [
@@ -569,7 +522,7 @@ String.
 
 B<tab_width>
 
-Tab width for tab-space conversion. -1 for disable it. -1 is the defult.
+Tab width for tab-space conversion. -1 for disable it. -1 is the default.
 
 =back
 
@@ -591,7 +544,7 @@ File name.
 
 B<tab_width>
 
-Tab width for tab-space conversion. -1 for disable it. -1 is the defult.
+Tab width for tab-space conversion. -1 for disable it. -1 is the default.
 
 B<encode>
 
@@ -635,7 +588,7 @@ Returns the class names in array.
 
 I<Syntax::Highlight::Engine::Simple> requires no configuration files or
 environment variables. Specific language syntax can be defined with
-sub classes and loaded in constractor if you give it the type argument.
+sub classes and loaded in constructor if you give it the type argument.
 
 =head1 DEPENDENCIES
 

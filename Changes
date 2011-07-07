@@ -1,5 +1,9 @@
 Revision history for Syntax-Highlight-Engine-Simple
 
+0.09  2011/07/07
+    
+    - Fixed: PBP test passed
+	
 0.08  2008/07/29
     
     - Fixed: Bug on priority control(test6 in highlight.t) on some invironment
